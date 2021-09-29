@@ -10,7 +10,7 @@ FROM build-env AS publish
 RUN dotnet publish "CryptoTicker.csproj" -c Release -o /publish
 
 FROM nginx:alpine AS final
-WORKDIR /usr/share/nginx/html
+WORKDIR /usr/local/webapp/nginx/html
 
-COPY --from=publish /publish/wwwroot /usr/local/webapp/nginx/html
+COPY --from=publish /publish/wwwroot .
 COPY nginx.conf /etc/nginx/nginx.conf
