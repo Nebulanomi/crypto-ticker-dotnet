@@ -11,9 +11,8 @@ A website that provides crypto price information. In this workshop we will:
 
 ### NGINX
 
-We're going to be using NGINX to serve our application inside our container
+We're going to be using NGINX to serve our application inside our container.
 As NGINX configuration is all opt-in it doesn't handle different mime types unless we tell it to. Also we will need to add in a mime type for wasm as this is not included in NGINXs default mime type list.
-
 ```
 events { }
 http {
@@ -39,7 +38,6 @@ Above in the `server` block we've included the default mime types as well as a c
 ### Adding the Dokcerfile
 
 This is the dockerfile in the root folder of our project
-
 ```
 FROM mcr.microsoft.com/dotnet/sdk:5.0 AS build-env
 WORKDIR /src
