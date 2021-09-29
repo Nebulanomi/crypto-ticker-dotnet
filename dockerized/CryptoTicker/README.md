@@ -75,7 +75,7 @@ We set the `WORKDIR` in the container to `/src` and then `COPY` over the `csproj
 
 ```
 FROM build AS publish
-RUN dotnet publish "BlazorWasmDocker.csproj" -c Release -o /app/publish
+RUN dotnet publish "CryptoTicker.csproj" -c Release -o /app/publish
 ```
 
 The next section publishes our app. This is pretty straightforward, we use the previous section as a base and then `RUN` the `dotnet publish` command to publish the project.
@@ -83,12 +83,12 @@ The next section publishes our app. This is pretty straightforward, we use the p
 #### Part 3
 ```
 FROM nginx:alpine AS final
-WORKDIR /usr/share/nginx/html
-COPY --from=publish /app/publish/BlazorWasmDocker/dist .
+WORKDIR /usr/local/webapp/nginx/html
+COPY --from=publish /publish/wwwroot .
 COPY nginx.conf /etc/nginx/nginx.conf
 ```
 
-The last section produces our final image. We use the `nginx:alpine` image as a base and start by setting the `WORKDIR` to `/usr/share/nginx/html` - this is the directory where we'll serve our application from. Next, we `COPY` over our published app from the previous publish section to the current working directory. Finally, we `COPY` over the `nginx.conf` we created earlier to replace the default configuration file.
+The last section produces our final image. We use the `nginx:alpine` image as a base and start by setting the `WORKDIR` to `/usr/local/webapp/nginx/html` - this is the directory where we'll serve our application from. Next, we `COPY` over our published app from the previous publish section to the current working directory. Finally, we `COPY` over the `nginx.conf` we created earlier to replace the default configuration file.
 
 
 ### Building the image
