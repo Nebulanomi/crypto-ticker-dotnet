@@ -108,3 +108,130 @@ This command tells Docker to start a container with the tag `crypto-ticker-with-
 
 ## Deploying to Azure
 
+[Configure a GitHub action to create a container instance](https://docs.microsoft.com/en-us/azure/container-instances/container-instances-github-action)
+
+### Prerequisites
+I already have created the Azure container registry.
+If you don't have one, create an Azure container registry in the Basic tier using the Azure CLI, Azure portal, or other methods. Take note of the resource group used for the deployment, which is used for the GitHub workflow.
+
+### Create service principal for Azure authentication
+In the GitHub workflow, you need to supply Azure credentials to authenticate to the Azure CLI. The following example creates a service principal with the Contributor role scoped to the resource group for your container registry.
+
+First, get the resource ID of your resource group. Substitute the name of your group in the following `az group show` command:
+```
+groupId=$(az group show \
+  --name <resource-group-name> \
+  --query id --output tsv)
+```
+
+Use az ad sp create-for-rbac to create the service principal:
+```
+az ad sp create-for-rbac \
+  --scope $groupId \
+  --role Contributor \
+  --sdk-auth
+```
+Output is similar to:
+```
+{
+  "clientId": "xxxx6ddc-xxxx-xxxx-xxx-ef78a99dxxxx",
+  "clientSecret": "xxxx79dc-xxxx-xxxx-xxxx-aaaaaec5xxxx",
+  "subscriptionId": "xxxx251c-xxxx-xxxx-xxxx-bf99a306xxxx",
+  "tenantId": "xxxx88bf-xxxx-xxxx-xxxx-2d7cd011xxxx",
+  "activeDirectoryEndpointUrl": "https://login.microsoftonline.com",
+  "resourceManagerEndpointUrl": "https://management.azure.com/",
+  "activeDirectoryGraphResourceId": "https://graph.windows.net/",
+  "sqlManagementEndpointUrl": "https://management.core.windows.net:8443/",
+  "galleryEndpointUrl": "https://gallery.azure.com/",
+  "managementEndpointUrl": "https://management.core.windows.net/"
+}
+```
+
+### Update service principal for registry authentication
+
+Update the Azure service principal credentials to allow push and pull access to your container registry. This step enables the GitHub workflow to use the service principal to authenticate with your container registry and to push and pull a Docker image.
+
+Get the resource ID of your container registry. Substitute the name of your registry in the following `az acr show` command:
+```
+registryId=$(az acr show \
+  --name <registry-name> \
+  --query id --output tsv)
+```
+
+Use `az role assignment create` to assign the AcrPush role, which gives push and pull access to the registry. Substitute the client of your service principal:
+```
+az role assignment create \
+  --assignee <ClientId> \
+  --scope $registryId \
+  --role AcrPush
+```
+
+### Save credentails to GitHub repo
+- In the GitHub UI, navigate to your forked repository and select Settings > Secrets.
+- Select `Add a new secret ` to add the following secrets:
+| `AZURE_CREDENTIALS` | The entire JSON output from the service principal creation step |
+|---|---|
+| `REGISTRY_LOGIN_SERVER` | The login server name of your registry (all lowercase). Example: myregistry.azurecr.io |
+| `REGISTRY_USERNAME` | The `clientId` from the JSON output from the service principal creation |
+| `REGISTRY_PASSWORD` | The `clientSecret` from the JSON output from the service principal creation |
+| `RESOURCE_GROUP` | The name of the resource group you used to scope the service principal |
+
+
+### Create GitHub Workflow
+
+- In the GitHub UI, select Actions > New workflow.
+- Select Set up a workflow yourself.
+- In Edit new file, paste the following YAML contents to overwrite the sample code. Accept the default filename `main.yml`, or provide a filename you choose.
+- Select Start commit, optionally provide short and extended descriptions of your commit, and select Commit new file.
+
+```yml
+on: [push]
+name: Linux_Container_Workflow
+
+jobs:
+    build-and-deploy:
+        runs-on: ubuntu-latest
+        steps:
+        # checkout the repo
+        - name: 'Checkout GitHub Action'
+          uses: actions/checkout@main
+          
+        - name: 'Login via Azure CLI'
+          uses: azure/login@v1
+          with:
+            creds: ${{ secrets.AZURE_CREDENTIALS }}
+        
+        - name: 'Build and push image'
+          uses: azure/docker-login@v1
+          with:
+            login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+            username: ${{ secrets.REGISTRY_USERNAME }}
+            password: ${{ secrets.REGISTRY_PASSWORD }}
+        - run: |
+            docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
+            docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
+
+        - name: 'Deploy to Azure Container Instances'
+          uses: 'azure/aci-deploy@v1'
+          with:
+            resource-group: ${{ secrets.RESOURCE_GROUP }}
+            dns-name-label: ${{ secrets.RESOURCE_GROUP }}${{ github.run_number }}
+            image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
+            registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+            registry-username: ${{ secrets.REGISTRY_USERNAME }}
+            registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+            name: sample-app
+            location: 'west us'
+```
+
+### Validate workflow
+After you commit the workflow file, the workflow is triggered. To review workflow progress, navigate to Actions > Workflows.
+
+When the workflow completes successfully, get information about the container instance named aci-sampleapp by running the `az container show` command. Substitute the name of your resource group:
+```
+az container show \
+  --resource-group <resource-group-name> \
+  --name sample-app \
+  --query "{FQDN:ipAddress.fqdn,ProvisioningState:provisioningState}" \
+  --output table
+```
