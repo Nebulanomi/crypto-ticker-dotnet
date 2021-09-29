@@ -168,12 +168,11 @@ az role assignment create \
 ### Save credentails to GitHub repo
 - In the GitHub UI, navigate to your forked repository and select Settings > Secrets.
 - Select `Add a new secret ` to add the following secrets:
-| `AZURE_CREDENTIALS` | The entire JSON output from the service principal creation step |
-|---|---|
+| `AZURE_CREDENTIALS`     | The entire JSON output from the service principal creation step |
 | `REGISTRY_LOGIN_SERVER` | The login server name of your registry (all lowercase). Example: myregistry.azurecr.io |
-| `REGISTRY_USERNAME` | The `clientId` from the JSON output from the service principal creation |
-| `REGISTRY_PASSWORD` | The `clientSecret` from the JSON output from the service principal creation |
-| `RESOURCE_GROUP` | The name of the resource group you used to scope the service principal |
+| `REGISTRY_USERNAME`     | The `clientId` from the JSON output from the service principal creation |
+| `REGISTRY_PASSWORD`     | The `clientSecret` from the JSON output from the service principal creation |
+| `RESOURCE_GROUP`        | The name of the resource group you used to scope the service principal |
 
 
 ### Create GitHub Workflow
